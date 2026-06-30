@@ -1,0 +1,11 @@
+data/
+.env
+.env.save
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+surya/

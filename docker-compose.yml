@@ -1,0 +1,70 @@
+services:
+  surya-vllm:
+    image: vllm/vllm-openai:v0.20.1-cu129
+    container_name: surya-vllm
+    restart: unless-stopped
+    runtime: nvidia
+    ipc: host
+    environment:
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      NVIDIA_VISIBLE_DEVICES: ${VLLM_GPU:-0}
+    volumes:
+      - ${HF_CACHE}:/root/.cache/huggingface
+    ports:
+      - "${VLLM_HOST_PORT:-8001}:8000"
+    command:
+      - --model
+      - datalab-to/surya-ocr-2
+      - --no-enforce-eager
+      - --max-num-seqs
+      - "32"
+      - --dtype
+      - bfloat16
+      - --max-model-len
+      - "18000"
+      - --max-num-batched-tokens
+      - "8192"
+      - --gpu-memory-utilization
+      - "0.85"
+      - --enable-prefix-caching
+      - --mm-processor-kwargs
+      - '{"min_pixels": 3136, "max_pixels": 6291456}'
+      - --served-model-name
+      - datalab-to/surya-ocr-2
+      - --speculative-config
+      - '{"method": "mtp", "num_speculative_tokens": 2}'
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      start_period: 600s
+
+  surya-ui:
+    build:
+      context: .
+      network: host
+    container_name: surya-ui
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      SURYA_INFERENCE_BACKEND: vllm
+      SURYA_INFERENCE_URL: http://surya-vllm:8000/v1
+      SURYA_AUTH_USER: ${SURYA_AUTH_USER:-admin}
+      SURYA_AUTH_PASSWORD: ${SURYA_AUTH_PASSWORD:-surya}
+      SURYA_UI_PORT: "7860"
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      QWEN_MODEL: ${QWEN_MODEL:-qwen2.5:3b}
+      DOC_INTEL_API_TOKEN: ${DOC_INTEL_API_TOKEN:-}
+      DOC_INTEL_PUBLIC_BASE_URL: ${DOC_INTEL_PUBLIC_BASE_URL:-http://localhost:7860}
+      DOC_INTEL_DATA_DIR: /app/data
+      SERVER_PORT: "7860"
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "${UI_HOST_PORT:-7860}:7860"
+    depends_on:
+      surya-vllm:
+        condition: service_healthy
