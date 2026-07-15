@@ -67,19 +67,30 @@ def ocr_image(
     type_hint: str,
     fields_raw: str,
     request: gr.Request,
-) -> tuple[str, str, str, str, str, str, list[list]]:
-    empty = ("", "", "", "", "(no fields found in OCR text)", "(no tables found)")
+) -> tuple[str, str, str, str, str, str, str, list[list]]:
+    empty = ("", "", "", "", "(no summary)", "(no fields found in OCR text)", "(no tables found)")
     if image is None:
         return (
             *empty[:4],
             empty[4],
             empty[5],
+            empty[6],
             _history_rows(request),
         )
 
     output, elapsed, tables = run_ocr_single(image)
     timing = f"{elapsed:.2f} seconds"
     doc_type, confidence = _classify(output, type_hint.strip() or None)
+
+    summary = ""
+    if output and output != "(no text detected)":
+        try:
+            summary = classifier.summarize_document(
+                output,
+                document_type=doc_type or None,
+            )
+        except Exception as exc:
+            summary = f"Summary failed: {exc}"
 
     field_names = _parse_fields(fields_raw)
     extracted: dict = {}
@@ -119,6 +130,7 @@ def ocr_image(
         timing,
         doc_type,
         confidence,
+        summary or "(no summary)",
         _format_fields(extracted),
         _format_tables(tables),
         _history_rows(request),
@@ -221,6 +233,10 @@ def build_ui() -> gr.Blocks:
                     with gr.Column():
                         doc_type_out = gr.Textbox(label="Document type (classification)")
                         confidence_out = gr.Textbox(label="Classification confidence")
+                        summary_out = gr.Textbox(
+                            label="Document summary",
+                            lines=6,
+                        )
                         fields_out = gr.Textbox(
                             label="Extracted fields",
                             lines=8,
@@ -269,6 +285,7 @@ def build_ui() -> gr.Blocks:
                 timing_text,
                 doc_type_out,
                 confidence_out,
+                summary_out,
                 fields_out,
                 tables_out,
                 history_table,

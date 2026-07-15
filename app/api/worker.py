@@ -134,6 +134,22 @@ def _process_job(job_id: str) -> None:
             language=request.language,
         )
 
+        summary: str | None = None
+        if request.includeSummary:
+            jobs_db.update_job(
+                job_id,
+                status=JobStatus.SUMMARIZATION,
+                message="Summarizing document",
+            )
+            try:
+                summary = classifier.summarize_document(
+                    ocr_result.full_text,
+                    document_type=document_type,
+                    language=request.language,
+                ) or None
+            except Exception:
+                logger.exception("Summarization failed for job %s", job_id)
+
         extracted: dict[str, FieldValue] = {}
         if request.fieldsToExtract:
             jobs_db.update_job(
@@ -176,6 +192,7 @@ def _process_job(job_id: str) -> None:
             documentType=document_type,
             language=request.language,
             ocrText=ocr_result.full_text,
+            summary=summary,
             extractedFields=extracted,
             tables=tables,
             pages=pages,
@@ -216,6 +233,7 @@ def _send_callback(request: AnalyzeDocumentRequest, result: JobResultResponse) -
             status=result.status,
             documentType=result.documentType,
             ocrText=result.ocrText,
+            summary=result.summary,
             extractedFields={
                 k: v.value for k, v in (result.extractedFields or {}).items()
             },

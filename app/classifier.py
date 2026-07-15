@@ -8,6 +8,7 @@ import httpx
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 QWEN_MODEL = os.getenv("QWEN_MODEL", "qwen2.5:3b")
 MAX_OCR_CHARS = int(os.getenv("MAX_OCR_CHARS_FOR_LLM", "12000"))
+SUMMARY_TEMPERATURE = float(os.getenv("SUMMARY_TEMPERATURE", "0.3"))
 
 DOCUMENT_TYPES = [
     "invoice",
@@ -248,6 +249,39 @@ def extract_fields(
             }
 
     return result
+
+
+def summarize_document(
+    ocr_text: str,
+    *,
+    document_type: str | None = None,
+    language: str | None = None,
+) -> str:
+    clean_text = _strip_html(ocr_text).strip()
+    if not clean_text:
+        return ""
+
+    doc_ctx = f" The document type is {document_type}." if document_type else ""
+    lang_ctx = (
+        f" Write the summary in {language}."
+        if language
+        else " Write the summary in the same language as the document."
+    )
+
+    system = (
+        "You summarize documents from their OCR text. "
+        "Produce a concise, faithful summary that captures the purpose, "
+        "key facts, parties, dates, and amounts mentioned. "
+        "The OCR may contain HTML tags — ignore tags and read visible text only. "
+        "Only use information present in the text — never invent details. "
+        "Return the summary as plain prose, no preamble or headings."
+    )
+    user = (
+        f"Summarize the following document.{doc_ctx}{lang_ctx}\n\n"
+        f"OCR text:\n{_truncate(clean_text)}"
+    )
+
+    return _ollama_chat(system, user, temperature=SUMMARY_TEMPERATURE).strip()
 
 
 def extract_tables_from_text(ocr_text: str) -> list[dict[str, Any]]:

@@ -10,6 +10,7 @@ class JobStatus(str, Enum):
     FIELD_EXTRACTION = "field_extraction"
     TABLE_EXTRACTION = "table_extraction"
     CLASSIFICATION = "classification"
+    SUMMARIZATION = "summarization"
     COMPLETED = "completed"
     FAILED = "failed"
 
@@ -22,6 +23,7 @@ class AnalyzeDocumentRequest(BaseModel):
     language: str | None = None
     documentTypeHint: str | None = None
     fieldsToExtract: list[str] = Field(default_factory=list)
+    includeSummary: bool = True
     callbackUrl: str | None = None
 
     @model_validator(mode="after")
@@ -79,6 +81,7 @@ class JobResultResponse(BaseModel):
     documentType: str | None = None
     language: str | None = None
     ocrText: str | None = None
+    summary: str | None = None
     extractedFields: dict[str, FieldValue] = Field(default_factory=dict)
     tables: list[TableResult] = Field(default_factory=list)
     pages: list[PageResult] = Field(default_factory=list)
@@ -98,6 +101,7 @@ class CallbackNotification(BaseModel):
     resultUrl: str | None = None
     documentType: str | None = None
     ocrText: str | None = None
+    summary: str | None = None
     extractedFields: dict[str, Any] | None = None
     tables: list[Any] | None = None
     error: str | None = None
